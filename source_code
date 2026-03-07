@@ -1,3 +1,52 @@
-# hello
-print("hello world")
-Koniichiwa
+import sys
+# DATA SET
+
+
+
+
+# Helper Functions
+
+
+# Function for Error Checking
+def has_error(line, lineno):
+   
+
+# Function for Translation
+def translate_to_binary(line, lineno):
+    
+    
+
+# Checking for invalid arguments
+if ( len(sys.argv) )!=3:
+    print("Incorrect Statement!!!\nUsage: assembler.py <input.asm> <output.bin>")
+    sys.exit(1)
+
+# Obtaining data from arguments
+input_file=sys.argv[1]
+output_file=sys.argv[2]
+
+# Loading the input Assembly Code
+inp_file=open(input_file, "r")
+lines=inp_file.read().split('\n')
+
+# Initializing global Variables
+labels={}
+tlabels={}
+rs=''
+MAX_PC=4*(len(lines)-1)
+
+# Checking for errors
+for lineno in range(len(lines)) :
+    line=lines[lineno]
+
+    # Checking if line is empty
+    if (line.isspace() or not(line)) :
+        continue
+
+    # Checking if line has error
+    has_error(line, lineno)
+
+# Checking for undefined labels
+for l in tlabels:
+    if l not in labels:
+        error(f"Undefined label {l}", tlabels[l])

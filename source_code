@@ -98,7 +98,40 @@ def has_error(line, lineno):
 
 # Function for Translation
 def translate_to_binary(line, lineno):
-    
+    line = line.strip().replace(', ', ',')
+    if not line:
+        return ''
+    if ":" in line:
+        colon_pos = line.index(":")
+        ln  = line[0:colon_pos]    # ln = label name
+        line = line[colon_pos + 1:].strip()
+    if not line:
+        return ''
+
+    parts = line.split()  # "add s1,s2,s3" becomes ["add", "s1,s2,s3"]
+
+    mnemonic = parts[0].strip()  # parts[0] is the mnemonic
+
+    args = []
+    if len(parts) > 1:
+        arg_str = parts[1].strip()
+        arg_str = arg_str.replace("(", ",").replace(")", "")  # lw a5,20(s1) -> "20,s1"
+        for a in arg_str.split(","):
+            args.append(a.strip())  # "a5,20,s1" becomes ["a5", "20", "s1"]
+
+    pc = lineno * 4
+
+    if mnemonic in i3 and len(i3[mnemonic]) == 3:    # For R type
+        funct7 = i3[mnemonic][0]
+        funct3 = i3[mnemonic][1]
+        opcode = i3[mnemonic][2]
+        rd  = Register_file[args[0]]
+        rs1 = Register_file[args[1]]
+        rs2 = Register_file[args[2]]
+        return funct7 + rs2 + rs1 + funct3 + rd + opcode
+
+
+
     
 
 # Checking for invalid arguments
@@ -136,37 +169,3 @@ for l in tlabels:
     if l not in labels:
         error(f"Undefined label {l}", tlabels[l])
 # Function for Translation
-def translate_to_binary(line, lineno):
-    line = line.strip().replace(', ', ',')
-    if not line:
-        return ''
-    if ":" in line:
-        colon_pos = line.index(":")
-        ln  = line[0:colon_pos]    # ln = label name
-        line = line[colon_pos + 1:].strip()
-    if not line:
-        return ''
-
-    parts = line.split()  # "add s1,s2,s3" becomes ["add", "s1,s2,s3"]
-
-    mnemonic = parts[0].strip()  # parts[0] is the mnemonic
-
-    args = []
-    if len(parts) > 1:
-        arg_str = parts[1].strip()
-        arg_str = arg_str.replace("(", ",").replace(")", "")  # lw a5,20(s1) -> "20,s1"
-        for a in arg_str.split(","):
-            args.append(a.strip())  # "a5,20,s1" becomes ["a5", "20", "s1"]
-
-    pc = lineno * 4
-
-    if mnemonic in i3 and len(i3[mnemonic]) == 3:    # For R type
-        funct7 = i3[mnemonic][0]
-        funct3 = i3[mnemonic][1]
-        opcode = i3[mnemonic][2]
-        rd  = Register_file[args[0]]
-        rs1 = Register_file[args[1]]
-        rs2 = Register_file[args[2]]
-        return funct7 + rs2 + rs1 + funct3 + rd + opcode
-
-

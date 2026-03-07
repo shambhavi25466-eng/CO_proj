@@ -130,6 +130,56 @@ def translate_to_binary(line, lineno):
         rs2 = Register_file[args[2]]
         return funct7 + rs2 + rs1 + funct3 + rd + opcode
 
+    elif mnemonic in i3 and len(i3[mnemonic]) == 2:
+        funct3 = i3[mnemonic][0]
+        opcode = i3[mnemonic][1]
+        if mnemonic in ["addi", "sltiu", "jalr"]:    # For I type (non-lw)
+            imm = twosComplement(args[2], 12)
+            rd  = Register_file[args[0]]
+            rs1 = Register_file[args[1]]
+            return imm + rs1 + funct3 + rd + opcode
+        elif mnemonic == "lw":                        
+            rd  = Register_file[args[0]]              # args[0] = rd
+            imm = twosComplement(args[1], 12)         # args[1] = immediate
+            rs1 = Register_file[args[2]]              # args[2] = base register
+            return imm + rs1 + funct3 + rd + opcode
+        else:   # For B type
+            rs1 = Register_file[args[0]]
+            rs2 = Register_file[args[1]]
+            ln  = args[2]                             # ln = label name or numeric offset
+            try:                                     
+                offset = int(ln)
+            except ValueError:
+                offset = labels[ln] - pc              # label: byte address minus current pc
+            imm = twosComplement(offset, 13)
+            return imm[0] + imm[2:8] + rs2 + rs1 + funct3 + imm[8:12] + imm[1] + opcode
+
+    elif mnemonic in i2 and len(i2[mnemonic]) == 2:   # for S type
+        funct3 = i2[mnemonic][0]
+        opcode = i2[mnemonic][1]
+        rs1 = Register_file[args[2]]
+        rs2 = Register_file[args[0]]
+        imm = twosComplement(args[1], 12)
+        return imm[0:7] + rs2 + rs1 + funct3 + imm[7:12] + opcode
+
+    elif mnemonic in i2 and len(i2[mnemonic]) == 1:
+        opcode = i2[mnemonic][0]
+        rd = Register_file[args[0]]
+        if mnemonic == "jal":    # for J type
+            ln = args[1]         # ln = label name or numeric target
+            try:                 
+                la = int(ln)
+            except ValueError:
+                la = labels[ln]  
+            offset = la - pc
+            imm = twosComplement(offset, 21)
+            return imm[0] + imm[10:20] + imm[9] + imm[1:9] + rd + opcode
+        else:   # for U type
+            imm = twosComplement(args[1], 20)
+            return imm + rd + opcode
+    return ''
+
+
 
 
     

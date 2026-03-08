@@ -1,9 +1,8 @@
 import sys
 
 # DATA SET
-
 Register_file = {
-    "0":"00000",
+    "0":    "00000",
     "zero": "00000",
     "ra":   "00001",
     "sp":   "00010",
@@ -88,12 +87,169 @@ i3 = {
 }
 
 
+##### Helper Functions -----
+def check_registors(*args):
+    r=args[:-1]
+    lineno=args[-1]
 
-# Helper Functions
+    for i in r:
+        if i not in Register_file:
+            error("Invalid register", lineno)
 
+def check_imm(imm, lineno):
+    try:
+        int(imm)
+    except:
+        error("Immediate must be integer", lineno)
 
-# Function for Error Checking
+def twosComplement(num, bits):
+    if isinstance(num, str):
+
+        if num.isdigit() or num[0]=='-':
+            num=int(num)
+        else:
+            num=int(Register_file[num])
+
+    if num<0:                     # two's complement for negative
+        num=(1<<bits)+num  
+    return bin(num)[2:].zfill(bits)
+
+def error(msg, lineno):
+    print(f"Error at lineno {lineno}: {msg}")
+    sys.exit(1)
+
+##### Function for Error Checking
 def has_error(line, lineno):
+    r = line.replace(",", " ")
+    r = r.replace("(", " ")
+    r = r.replace(")", " ")
+
+    w_l = r.split()  #converting each line instructions into list of strings... in which first word will be either label or instruction
+
+    if len(w_l)== 0:
+        return
+
+    # ---------------- LABEL CHECK ----------------
+    ##### if label is present and it is correct then it will store the
+    ####  line no. which we can use later to find pc... if needed...
+    ###   otherwise it will return an error.
+
+    #     pc_label = (lables[label])
+    #     pc_current =  (lineno)
+    #     offset = (pc_label - pc_current)*4
+    if w_l[0].endswith(":"):
+        label= w_l[0][:-1]
+
+        if label== "":
+            error("Invalid label", lineno)
+
+        if label in Register_file:
+            error("Label cannot be register name", lineno)
+
+        if label in i2 or label in i3:
+            error("Label cannot be instruction name", lineno)
+
+        if label[0].isdigit():
+            error("Label cannot start with digit", lineno)
+
+        if label in labels:
+            error("Duplicate label", lineno)
+
+        if not label.replace("_","").isalnum():
+            error("Invalid label name", lineno)
+
+        labels[label]= lineno*4
+
+        if len(w_l)== 1:
+            return
+
+        w_l= w_l[1:]
+    op = w_l[0]
+
+    ##### we have successfuly checked for the label case... 
+    ##### now, let's see for the 2 argument and 3 argument instructions...
+    # ---------------- UNKNOWN INSTRUCTION ----------------
+
+    if op not in i2 and op not in i3:
+        error("Unknown instruction", lineno)
+
+    # ---------------- TWO OPERAND INSTRUCTIONS ----------------
+
+    if op in i2:
+        if op== "sw":
+
+            if len(w_l) !=4:
+                error("Incorrect no. of operands", lineno)
+
+            rs2 = w_l[1]
+            imm = w_l[2]
+            rs1 = w_l[3]
+
+            check_registors(rs1, rs2, lineno)
+            check_imm(imm, lineno)
+
+
+        elif op in ["lui","auipc"]:
+
+            if len(w_l)!= 3:
+                error("Incorrect number of operands", lineno)
+
+            rd = w_l[1]
+            imm= w_l[2]
+
+            check_registors(rd, lineno)
+            check_imm(imm, lineno)
+
+        elif op== "jal":
+
+            if len(w_l)!= 3:
+                error("Incorrect number of operands", lineno)
+
+            rd  = w_l[1]
+            label = w_l[2]
+            check_registors(rd, lineno)
+
+            if not label.isdigit() and label not in labels:
+                tlabels[label]=lineno
+                #error("Undefined label", lineno)
+
+            if label.isdigit() and int(label)>MAX_PC:
+                error("Program counter overflow", lineno)
+
+    # ---------------- THREE OPERAND INSTRUCTIONS ----------------
+
+    if op in i3:
+        if len(w_l)!= 4:
+            error("Incorrect number of operands", lineno)
+
+        x= w_l[1]
+        y= w_l[2]
+        z= w_l[3]
+
+        # -------- R TYPE --------
+        if op in ["add","sub","sll","slt","sltu","xor","srl","or","and"]:
+            check_registors(x,y,z, lineno)
+
+        # -------- I TYPE --------
+        elif op in ["addi","sltiu","jalr"]:
+            check_registors(x,y, lineno)
+            check_imm(z, lineno)
+
+        elif op== "lw":
+
+            check_registors(x,z, lineno)
+            check_imm(y, lineno)
+
+        # -------- B TYPE --------
+        elif op in ["beq","bne","blt","bge","bltu","bgeu"]:
+
+            check_registors(x,y, lineno)
+
+            if not z.isdigit() and z not in labels:
+                tlabels[z]=lineno
+                #error("Undefined label", lineno)
+            if z.isdigit() and int(z)>MAX_PC:
+                error("Program counter overflow", lineno)
    
 
 # Function for Translation
@@ -151,6 +307,10 @@ def translate_to_binary(line, lineno):
                 offset = int(ln)
             except ValueError:
                 offset = labels[ln] - pc              # label: byte address minus current pc
+
+            if offset < -4096 or offset > 4094:       ## Offset should be in Valid Range...
+                error("Branch immediate out of range", lineno)
+
             imm = twosComplement(offset, 13)
             return imm[0] + imm[2:8] + rs2 + rs1 + funct3 + imm[8:12] + imm[1] + opcode
 
@@ -180,12 +340,8 @@ def translate_to_binary(line, lineno):
     return ''
 
 
-
-
-    
-
 # Checking for invalid arguments
-if ( len(sys.argv) )!=3:
+if ( len(sys.argv) ) < 3:
     print("Incorrect Statement!!!\nUsage: assembler.py <input.asm> <output.bin>")
     sys.exit(1)
 
@@ -203,13 +359,62 @@ tlabels={}
 rs=''
 MAX_PC=4*(len(lines)-1)
 
+
+##### Virtual Halt checking ---
+h_count = 0  ## halt_count
+h_line = 0   ## halt_line
+
+for i in range(len(lines)):
+
+    line= lines[i].strip()
+
+    if not(line) or (line.isspace()):
+        continue
+
+    ht= line.replace(",", " ")
+    ht= ht.replace("(", " ")
+    ht= ht.replace(")", " ")
+
+    h_l = ht.split()   ## converted line of strings to list to strings[words]
+
+    # if there is label... then...
+    if h_l[0].endswith(":"):
+        h_l = h_l[1:]
+
+    if h_l== ["beq", "zero", "zero", "0"]:
+        h_count+= 1
+        h_line = i
+
+
+# In case of Virtual Halt Missing--
+if h_count== 0:
+    error("Virtual Halt instruction Missing", len(lines))
+
+
+# Multiple Virtual Halts
+if h_count> 1:
+    error("Multiple Virtual Halt instructions", h_line)
+
+
+# If Virtual Halt not last instruction
+for j in range(h_line+1, len(lines)):
+    if lines[j].strip() != "":
+        error("Virtual Halt must be the last instruction", h_line)
+
+inst_count = 0  ###
 # Checking for errors
 for lineno in range(len(lines)) :
     line=lines[lineno]
 
+    ##### Instruction Count---
     # Checking if line is empty
     if (line.isspace() or not(line)) :
         continue
+        inst_count += 1
+
+    # instruction memory limit check
+    if inst_count > 64:
+        error("Program exceeded its 64 instruction limit", lineno)
 
     # Checking if line has error
     has_error(line, lineno)
@@ -218,4 +423,44 @@ for lineno in range(len(lines)) :
 for l in tlabels:
     if l not in labels:
         error(f"Undefined label {l}", tlabels[l])
-# Function for Translation
+
+ #Translating to binary ar no error found
+for lineno in range(len(lines)) :
+    line=lines[lineno]
+
+    # Checking if line is empty
+    if (line.isspace() or not(line)) :
+        continue
+
+    # tls=Translated line string
+    tls=translate_to_binary(line, lineno)
+    if tls :
+        rs+= tls + '\n'
+
+
+# Storing the output in output file
+opt_file=open(output_file, "w")
+opt_file.write(rs) # Use rs[:-1] if last newline to be ignored
+
+opt_file.close()
+inp_file.close()
+
+
+
+######################-----Contributions-----#######################
+# Workload Distribution 
+'''
+    | Nayan Mohan
+        * Database 
+        * Translation 
+        * translate_to_binary() (I type instruction onwards)
+    | Nitish Kumar Yadav 
+        • Error checking
+        * has_error() functoion & virtual_halt checking
+    | Shambhavi
+        * Code Structure Creation + Overall edits
+        * Main Function
+    | Vinyas Maurya
+        * Binary translation of assembly code
+        * translate_to_binary() (till I type instruction)
+'''

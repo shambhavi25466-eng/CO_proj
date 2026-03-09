@@ -115,7 +115,7 @@ def twosComplement(num, bits):
     return bin(num)[2:].zfill(bits)
 
 def error(msg, lineno):
-    print(f"Error at lineno {lineno}: {msg}")
+    print(f"Error at lineno {lineno+1}: {msg}")
     sys.exit(1)
 
 ##### Function for Error Checking
@@ -360,47 +360,7 @@ rs=''
 MAX_PC=4*(len(lines)-1)
 
 
-##### Virtual Halt checking ---
-h_count = 0  ## halt_count
-h_line = 0   ## halt_line
-
-for i in range(len(lines)):
-
-    line= lines[i].strip()
-
-    if not(line) or (line.isspace()):
-        continue
-
-    ht= line.replace(",", " ")
-    ht= ht.replace("(", " ")
-    ht= ht.replace(")", " ")
-
-    h_l = ht.split()   ## converted line of strings to list to strings[words]
-
-    # if there is label... then...
-    if h_l[0].endswith(":"):
-        h_l = h_l[1:]
-
-    if h_l== ["beq", "zero", "zero", "0"]:
-        h_count+= 1
-        h_line = i
-
-
-# In case of Virtual Halt Missing--
-if h_count== 0:
-    error("Virtual Halt instruction Missing", len(lines))
-
-
-# Multiple Virtual Halts
-if h_count> 1:
-    error("Multiple Virtual Halt instructions", h_line)
-
-
-# If Virtual Halt not last instruction
-for j in range(h_line+1, len(lines)):
-    if lines[j].strip() != "":
-        error("Virtual Halt must be the last instruction", h_line)
-
+#### Instruction counts checking....
 inst_count = 0  ###
 # Checking for errors
 for lineno in range(len(lines)) :
@@ -424,7 +384,45 @@ for l in tlabels:
     if l not in labels:
         error(f"Undefined label {l}", tlabels[l])
 
- #Translating to binary ar no error found
+##### Virtual Halt checking ---
+h_count = False  ## halt_count
+
+for i in range(len(lines)):
+
+    line= lines[i].strip()
+
+    if not(line) or (line.isspace()):
+        continue
+
+    ht= line.replace(",", " ")
+    ht= ht.replace("(", " ")
+    ht= ht.replace(")", " ")
+    #ht=htmreplace(", ",",")
+
+    h_l = ht.split()   ## converted line of strings to list to strings[words]
+
+    # if there is label... then...
+    if h_l[0].endswith(":"):
+        if h_l[1:-1]== ["beq", "zero", "zero"]:
+            if h_l[-1]=='0' or (h_l[0][:-1]==h_l[-1]):
+                if h_count: 
+                    error("Multiple Virtual Halt instructions", i)
+                else:
+                    h_count=True
+    elif h_l==["beq", "zero", "zero",'0']:
+        if h_count: 
+            error("Multiple Virtual Halt instructions", i)
+        else:
+            h_count=True
+
+
+# In case of Virtual Halt Missing--
+if not h_count:
+    # Virtual halt not the last instruction 
+    error("Virtual Halt instruction Missing", -1)
+
+
+ #Translating to binary as no error found
 for lineno in range(len(lines)) :
     line=lines[lineno]
 

@@ -1,0 +1,241 @@
+# hello
+
+#1. VV
+# take input and output files from sys.args...
+#Loading the file
+
+#Create list storing data of each line
+lines=[]
+'''
+[line1, line2,...]
+
+line=[instruction type from opcode, other arguments in order ]
+
+instruction type =R,I,S,B,U,J 
+'''
+
+##### Nitish San...
+###   Meoowww Functions...
+def write(reg, value):
+    value= value& 0xFFFFFFFF # 32-bit mask ##0xFFFFFFFF == (2**32 -1)
+    reg = f"x{int(reg,2)}"
+    if reg!= "x0":
+        registers[reg]= value
+
+def read(reg):
+    reg = f"x{int(reg,2)}"
+    return registers[reg]
+
+def read_mem(mem_id)-> int:
+    address= int(mem_id,2)
+    if address in data_mem:
+        return data_mem[address]
+    else:
+        return 0
+
+def write_mem(mem_id, data):
+    address= int(mem_id, 2)
+    data_mem[address]= data & 0xFFFFFFFF
+
+def decimal(bin_no, no_of_bits=False):
+    if not no_of_bits:
+        no_of_bits= len(bin_no)
+
+    val= int(bin_no, 2)
+
+    if bin_no[0]== '1':
+        val = val-(2**no_of_bits) #(1<< no_of_bits)
+    return val
+
+def binary(dec_no, no_of_bits=32)-> str:
+    val = dec_no&((2**no_of_bits) - 1)
+    return f"{val:0{no_of_bits}b}"
+
+#3. Nayan bro
+'''
+Initialize the register dict
+initialize the output list['line1', 'line2',...]
+make the function that adds the output string to the output list on calling
+
+make the function that makes the final output string and writes the output{'\n'.join(output_list)} to the output file on virtual halt'''
+
+#register dict
+rd={}
+
+opt_list=[]
+
+def add_to_opt():
+    # take values from rd
+    pass
+
+def evoke_virtual_halt():
+    # add virtual halt lines
+    # flush the output in opt file
+    pass
+
+def sext(binary_value)->str:
+    s=str(binary_value)
+
+    return s[0]*(32-len(s)) + s
+    
+
+#4. Shambhavi
+pc=0
+old_pc=None
+
+while True :
+
+    # check for virtual halt
+    if old_pc == pc :
+        evoke_virtual_halt()
+        break
+
+    line = lines[pc//4]
+    old_pc=pc
+
+    type = line[0]
+
+    if type=='R':
+        funct7, rs2, rs1, funct3, rd =line[1:]
+
+        match funct7:
+            case '0100000':
+                if funct3=='000':
+                    # sub
+                    write(rd, read(rs1)-read(rs2))
+            case '0000000':
+                match funct3 :
+                    case '000':
+                        # add
+                        write(rd, read(rs1)+read(rs2))
+                    case '001':
+                        # sll
+                        rs2_5=read(rs2)&31
+                        write(rd, read(rs1)<<rs2_5)
+                    case '010':
+                        # slt
+                        if read(rs1)<read(rs2):
+                            write(rd, 1)
+                        else :
+                            write(rd, 0)
+                    case '011':
+                        # sltu
+                        rs1_unsigned = binary(read(rs1), 32)
+                        rs2_unsigned = binary(read(rs2), 32)
+                        if rs1_unsigned<rs2_unsigned:
+                            write(rd, 1)
+                        else:
+                            write(rd, 0)
+                    case '100':
+                        # xor
+                        write(rd, read(rs1)^read(rs2))
+                    case '101':
+                        # srl
+                        rs2_5=read(rs2)&31
+                        write(rd, read(rs1)>>rs2_5)
+                    case '110':
+                        # or
+                        write(rd, read(rs1)|read(rs2))
+                    case '111':
+                        # and
+                        write(rd, read(rs1)&read(rs2))
+
+    elif type=='I' or type=='Ir':
+        imm, rs1, funct3, rd=line[1:]
+
+        if type=='I':
+            match funct3:
+                case '010':
+                    # lw
+                    imm_dec = decimal(imm, 12)
+                    write(rd, read_mem(sext(binary(imm_dec + read(rs1)))))
+                    
+                case '000':
+                    # addi
+                    write(rd, read(rs1)+decimal(imm, 12))
+
+                case '011':
+                    # sltiu
+                    rs1_unsigned=binary(read(rs1), 32)
+                    imm_unsigned=imm[0]*20 + imm
+                    if rs1_unsigned< imm_unsigned:
+                        write(rd, 1)
+                    else :
+                        write(rd, 0)
+        else :
+            if funct3=='000':
+                # jalr
+                write(rd, pc+4)
+                add_to_opt()
+                pc= read(rs1)+ decimal(imm, 12)
+                pc=pc & 0xFFFFFFFE
+                continue
+
+    elif type=='S':
+        imm1,rs2,rs1,funct3, imm2 =line[1:]
+        imm=imm1+imm2
+        write_mem(binary(read(rs1)+decimal(imm, 12), 32), read(rs2) )
+
+    elif type=='B':
+        imm1, rs2, rs1, funct3, imm2 =line[1:]
+        imm=imm1[0]+imm2[4]+imm1[1:7]+imm2[0:4]+"0"
+
+        match funct3:
+            case '000':
+                # beq
+                if read(rs1)==read(rs2) : 
+                    add_to_opt()
+                    pc=pc+decimal(imm, 13)
+                    continue
+            case '001':
+                # bne
+                if read(rs1)!=read(rs2) : 
+                    add_to_opt()
+                    pc=pc+decimal(imm, 13)
+                    continue
+            case '100':
+                # blt
+                if read(rs1)<read(rs2) : 
+                    add_to_opt()
+                    pc=pc+decimal(imm, 13)
+                    continue
+            case '101':
+                # bge
+                if read(rs1)>=read(rs2) : 
+                    add_to_opt()
+                    pc=pc+decimal(imm, 13)
+                    continue
+            case '110':
+                # bltu
+                if binary(read(rs1), 32)<binary(read(rs2), 32) : 
+                    add_to_opt()
+                    pc=pc+decimal(imm, 13)
+                    continue
+            case '111':
+                # bgeu
+                if  binary(read(rs1), 32)>=binary(read(rs2), 32) : 
+                    add_to_opt()
+                    pc=pc+decimal(imm, 13)
+                    continue
+
+    elif type=='U1' or type =='U2':
+        imm, rd =line[1:]
+        match type :
+            case 'U1':
+                # lui
+                write(rd,decimal(imm+'0'*12, 32))
+            case 'U2':
+                # auipc
+                write(rd,pc + decimal(imm+'0'*12, 32))
+
+    elif type=='J':
+        imm, rd =line[1:]
+        imm = imm[0]+ imm[12:20]+imm[11]+imm[1:11]+ '0'
+        write(rd, pc+4)
+        add_to_opt()
+        pc=pc+decimal(imm, 21)
+        pc=pc & 0xFFFFFFFE
+        continue
+
+    add_to_opt()
+    pc+=4
